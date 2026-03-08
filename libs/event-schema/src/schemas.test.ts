@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { AnyEventSchema, TrackEventSchema, IdentifyEventSchema } from './schemas';
+import { AnyEventSchema, TrackEventSchema } from './schemas';
 
 describe('TrackEventSchema', () => {
   it('validates a valid track event', () => {
