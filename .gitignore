@@ -1,6 +1,7 @@
 node_modules
 dist
 .next
+out
 .astro
 coverage
 cdk.out
@@ -11,3 +12,4 @@ cdk.out
 *.log
 .DS_Store
 .turbo
+.vercel
