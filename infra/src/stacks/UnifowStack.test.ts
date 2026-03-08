@@ -1,7 +1,17 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import * as cdk from 'aws-cdk-lib';
 import { Template, Match } from 'aws-cdk-lib/assertions';
+import { mkdirSync } from 'fs';
+import { join } from 'path';
 import { UnifowStack } from './UnifowStack';
+
+// CDK Lambda constructs require dist/ directories to exist for Code.fromAsset()
+beforeAll(() => {
+  const services = ['authorizer', 'ingest', 'processor', 'connector', 'management-api'];
+  for (const svc of services) {
+    mkdirSync(join(__dirname, `../../../services/${svc}/dist`), { recursive: true });
+  }
+});
 
 function createTemplate(): Template {
   const app = new cdk.App();
