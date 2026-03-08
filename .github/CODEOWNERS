@@ -1,0 +1,13 @@
+# Global owners — review required for all changes
+* @maroil
+
+# Infrastructure
+/infra/ @maroil
+/services/ @maroil
+
+# Connectors — connector authors can self-merge their own connector
+/connectors/webhook/ @maroil
+/connectors/s3-export/ @maroil
+
+# CLI
+/cli/ @maroil

@@ -3,7 +3,10 @@
     "allow": [
       "Bash(git init:*)",
       "Bash(/Users/marouane/Documents/Projects/uniflow/sdk/python/tests/test_client.py:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(chmod +x:*)",
+      "Bash(git:*)",
+      "Bash(gh:*)"
     ]
   }
 }
