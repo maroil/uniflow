@@ -60,6 +60,12 @@ export const PageEventSchema = BaseEventSchema.extend({
     .optional(),
 });
 
+export const ScreenEventSchema = BaseEventSchema.extend({
+  type: z.literal('screen'),
+  name: z.string().optional(),
+  properties: z.record(z.unknown()).optional(),
+});
+
 export const GroupEventSchema = BaseEventSchema.extend({
   type: z.literal('group'),
   groupId: z.string(),
@@ -70,5 +76,6 @@ export const AnyEventSchema = z.discriminatedUnion('type', [
   TrackEventSchema,
   IdentifyEventSchema,
   PageEventSchema,
+  ScreenEventSchema,
   GroupEventSchema,
 ]);

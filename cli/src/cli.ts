@@ -5,6 +5,7 @@ import { deployCommand } from './commands/deploy.js';
 import { statusCommand } from './commands/status.js';
 import { upgradeCommand } from './commands/upgrade.js';
 import { destroyCommand } from './commands/destroy.js';
+import { devCommand } from './commands/dev.js';
 
 const program = new Command();
 
@@ -18,5 +19,6 @@ program.addCommand(deployCommand);
 program.addCommand(statusCommand);
 program.addCommand(upgradeCommand);
 program.addCommand(destroyCommand);
+program.addCommand(devCommand);
 
 program.parse();
