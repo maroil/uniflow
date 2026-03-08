@@ -7,102 +7,81 @@
 
 ## Phase 0 — Repo Scaffold
 
-- [ ] **0.1** Initialize pnpm workspace monorepo with Turborepo
+- [x] **0.1** Initialize pnpm workspace monorepo with Turborepo
   - `pnpm init` + `pnpm-workspace.yaml` covering `infra`, `services/*`, `connectors/*`, `libs/*`, `cli`, `sdk/*`, `ui`
   - `turbo.json` with `build`, `test`, `lint` pipelines
-- [ ] **0.2** Add root tooling config
+- [x] **0.2** Add root tooling config
   - ESLint (flat config) + Prettier
   - TypeScript base `tsconfig.json` (shared, extended by each package)
   - Vitest workspace config
-- [ ] **0.3** GitHub Actions CI pipeline
-  - `.github/workflows/ci.yml`: lint → test → build (on push/PR)
-  - `.github/workflows/release.yml`: publish CLI + CDK on tag push
-- [ ] **0.4** Create top-level directory structure
-  ```
-  infra/       # CDK stacks (@uniflow/cdk)
-  services/    # Lambda + Fargate handlers
-  connectors/  # Destination plugins
-  libs/        # Shared internal packages
-  cli/         # uniflow CLI
-  sdk/         # Client tracking SDKs
-  ui/          # Next.js 16 admin dashboard
-  docker/      # Local dev (docker-compose + localstack)
-  docs/        # Docusaurus site
-  examples/    # Sample CDK app
-  ```
+- [~] **0.3** GitHub Actions CI pipeline
+  - `.github/workflows/ci.yml`: lint → test → build (on push/PR) ✅
+  - `.github/workflows/release.yml`: publish CLI + CDK on tag push ❌ (only docker.yml for ECR, no npm release workflow)
+- [~] **0.4** Create top-level directory structure
+  - `infra/`, `services/`, `connectors/`, `libs/`, `cli/`, `sdk/`, `ui/`, `docker/`, `examples/` ✅
+  - `docs/` (Docusaurus) ❌ missing
 
 ---
 
 ## Phase 1 — Event Schema + Core Libs
 
-- [ ] **1.1** `libs/event-schema` — Zod schemas for all event types
-  - `track`, `identify`, `page`, `group`, `screen` event shapes
-  - Shared `UnifowEvent` union type
-  - `validateEvent(raw): UnifowEvent` helper
-- [ ] **1.2** `libs/identity` — Identity resolution logic
-  - `resolveIdentity(anonymousId, userId)` — merges IDs in DynamoDB identity graph
-  - `getCanonicalUserId(anonymousId)` — looks up resolved userId
-- [ ] **1.3** `libs/logger` — Structured logging
-  - Thin wrapper around AWS Lambda Powertools Logger
-  - Consistent log shape: `{ level, service, requestId, ...fields }`
-- [ ] **1.4** Write unit tests for all libs (Vitest)
+- [~] **1.1** `libs/event-schema` — Zod schemas for all event types
+  - `track`, `identify`, `page`, `group` ✅ — `screen` event ❌ missing
+  - Shared `AnyEvent` union type ✅
+  - `validateEvent(raw): UnifowEvent` standalone helper ❌ (parsing is inline via `.parse()`)
+- [x] **1.2** `libs/identity` — Identity resolution logic
+  - `IdentityResolver.resolve()` + `IdentityGraph` interface ✅
+  - `DynamoIdentityGraph` impl in `services/processor` ✅
+- [~] **1.3** `libs/logger` — Structured logging
+  - Custom structured JSON logger ✅
+  - AWS Lambda Powertools Logger ❌ (used simple custom impl instead)
+- [~] **1.4** Write unit tests for all libs (Vitest)
+  - `libs/event-schema` tests ✅ — `libs/identity` tests ❌ missing
 
 ---
 
 ## Phase 2 — Storage Infrastructure (CDK)
 
-- [ ] **2.1** `infra/src/constructs/StorageConstruct.ts`
-  - DynamoDB table (single-table design, PAY_PER_REQUEST, point-in-time recovery)
-  - S3 bucket: `raw/` (Parquet archive, lifecycle: Glacier after 90 days)
-  - S3 bucket: `processed/` (curated data for Athena)
-  - Glue Database + Crawler for Athena catalog
-  - KMS key for Secrets Manager (destination credentials)
-- [ ] **2.2** DynamoDB single-table entity design
-  - Profile: `PK=PROFILE#<userId>` `SK=META`
-  - Event: `PK=PROFILE#<userId>` `SK=EVENT#<ts>#<id>`
-  - Identity: `PK=ANON#<anonymousId>` `SK=IDENTITY`
-  - Segment: `PK=SEGMENT#<id>` `SK=META`
-  - SegmentMember: `PK=SEGMENT#<id>` `SK=MEMBER#<userId>`
-  - Source: `PK=SOURCE#<id>` `SK=META`
-  - Destination: `PK=DEST#<id>` `SK=META`
-  - Migration: `PK=MIGRATION#<id>` `SK=META`
+- [~] **2.1** `infra/src/constructs/StorageConstruct.ts`
+  - DynamoDB table (single-table, PAY_PER_REQUEST, PITR, GSI) ✅
+  - S3 `raw/` bucket (lifecycle → Intelligent-Tiering) ✅
+  - S3 `processed/` bucket ✅
+  - Kinesis Firehose → S3 ✅
+  - Glue Database + Crawler for Athena catalog ❌ missing
+  - KMS key for Secrets Manager ❌ missing
+- [x] **2.2** DynamoDB single-table entity design (all 8 entities implemented in code)
 - [ ] **2.3** CDK snapshot tests for StorageConstruct
 
 ---
 
 ## Phase 3 — Ingestion Pipeline (CDK + Lambda)
 
-- [ ] **3.1** `infra/src/constructs/IngestionConstruct.ts`
-  - Kinesis Data Stream (7-day retention, on-demand capacity)
-  - Kinesis Firehose → S3 `raw/` (Parquet conversion, partitioned by `source/year/month/day`)
-  - API Gateway HTTP API (`/v1/track`, `/v1/identify`, `/v1/page`, `/v1/group`, `/v1/batch`)
-  - Lambda authorizer (validates `writeKey` against DynamoDB `SOURCE#` records)
-  - Ingest Lambda function (validate → enrich → publish to Kinesis)
-- [ ] **3.2** `services/ingest/` — Ingest Lambda handler
-  - Parse + validate event with `libs/event-schema`
-  - Enrich: add `sourceId`, `receivedAt`, `messageId` (UUID)
-  - Publish to Kinesis Data Stream
-  - Return `200 OK { success: true }` or `400` with validation errors
-- [ ] **3.3** Lambda authorizer
-  - Read `writeKey` from `Authorization: Bearer <key>` header
-  - Hash and compare against DynamoDB `SOURCE#<id>.writeKeyHash`
-  - Cache policy: 5 minutes
-- [ ] **3.4** Unit tests for ingest Lambda (mock Kinesis with `aws-sdk-client-mock`)
+- [~] **3.1** `infra/src/constructs/IngestionConstruct.ts`
+  - Kinesis Data Stream (7-day retention) ✅
+  - Kinesis Firehose → S3 (GZIP, date-partitioned) ✅
+  - API Gateway HTTP API (all 5 routes) ✅
+  - Lambda authorizer (writeKey validation) ❌ missing
+  - Ingest Lambda ✅
+- [~] **3.2** `services/ingest/` — Ingest Lambda handler
+  - Validate with event-schema ✅
+  - Enrich with `messageId`, `timestamp` ✅ — `sourceId`, `receivedAt` ❌ not enriched
+  - Publish to Kinesis ✅
+  - 200/400 responses ✅
+- [ ] **3.3** Lambda authorizer (writeKey hash check against DynamoDB SOURCE# records)
+- [x] **3.4** Unit tests for ingest Lambda (aws-sdk-client-mock)
 - [ ] **3.5** CDK snapshot tests for IngestionConstruct
 
 ---
 
 ## Phase 4 — Stream Processing: Identity + Profiles (CDK + Lambda)
 
-- [ ] **4.1** `infra/src/constructs/ProcessingConstruct.ts`
-  - Lambda Event Source Mapping: Kinesis → Processor Lambda (batch size 100, bisect on error)
-  - IAM roles for DynamoDB read/write
-- [ ] **4.2** `services/processor/` — Kinesis consumer Lambda
-  - For each event in batch:
-    - `identify` event → call `libs/identity.resolveIdentity()` → upsert profile traits in DynamoDB
-    - `track/page/group` event → append event record to DynamoDB + resolve anonymousId
-    - Fan-out: write event to SQS queues for each enabled destination
-  - Dead-letter handling: failed records to SQS DLQ
+- [x] **4.1** `infra/src/constructs/ProcessingConstruct.ts`
+  - Kinesis → Lambda (batch 100, bisect on error, DLQ) ✅
+  - IAM roles ✅
+- [x] **4.2** `services/processor/` — Kinesis consumer Lambda
+  - Identity resolution + profile upsert ✅
+  - SQS fan-out to destinations ✅
+  - DLQ on failure ✅
 - [ ] **4.3** Unit tests for processor Lambda
 - [ ] **4.4** CDK snapshot tests for ProcessingConstruct
 
@@ -110,22 +89,18 @@
 
 ## Phase 5 — Segmentation (CDK + Fargate)
 
-- [ ] **5.1** `infra/src/constructs/AudienceConstruct.ts`
-  - ECS Cluster + Fargate Task Definition (audience-builder image)
-  - EventBridge Scheduler: daily trigger of Fargate task
-  - IAM roles for Athena, S3, DynamoDB read/write
-- [ ] **5.2** `services/audience-builder/` — Fargate task (Node.js container)
-  - Load segment definitions from DynamoDB (`SEGMENT#*`)
-  - For each segment: translate rule set → Athena SQL → run query
-  - Write results back to DynamoDB SegmentMember records
-  - Publish to public ECR as `uniflow/audience-builder:<version>`
-- [ ] **5.3** Segment rule DSL (JSON)
-  ```json
-  { "and": [
-    { "trait": "plan", "op": "eq", "value": "pro" },
-    { "event": "Checkout Completed", "op": "gte", "count": 2 }
-  ]}
-  ```
+- [~] **5.1** `infra/src/constructs/AudienceConstruct.ts`
+  - ECS Fargate + EventBridge Scheduler ✅
+  - IAM for Athena, S3, DynamoDB ✅
+  - Scheduler set to hourly (plan says daily) — minor delta
+- [~] **5.2** `services/audience-builder/` — Fargate task
+  - Loads segments, runs Athena queries, writes SegmentMember records ✅
+  - Dockerfile ✅
+  - ECR publish via GitHub Actions ✅
+  - `Glue catalog / Athena database` not provisioned by CDK ❌
+- [~] **5.3** Segment rule DSL
+  - Flat array of rules (`field/operator/value`) ✅
+  - Nested `and/or` logical operators ❌ not implemented
 - [ ] **5.4** Unit tests for rule-to-SQL translator (Vitest)
 - [ ] **5.5** CDK snapshot tests for AudienceConstruct
 
@@ -133,42 +108,35 @@
 
 ## Phase 6 — Destinations + Connector SDK
 
-- [ ] **6.1** `connectors/sdk/` — Connector interface
-  ```typescript
-  export abstract class BaseConnector {
-    abstract configSchema: ZodSchema;
-    abstract handle(event: UnifowEvent, config: unknown): Promise<void>;
-  }
-  ```
-- [ ] **6.2** `connectors/webhook/` — HTTP Webhook connector
-  - POST event payload to configured URL
-  - Retry with exponential backoff (3 attempts)
-  - HMAC-SHA256 signature header
-- [ ] **6.3** `connectors/s3-export/` — S3 dump connector
-  - Write events as NDJSON to a customer-specified S3 bucket
-  - Batch by hour, file per source
+- [x] **6.1** `connectors/sdk/` — `BaseConnector` abstract class + `ConnectorEvent`/`ConnectorResult` types
+- [~] **6.2** `connectors/webhook/` — HTTP Webhook connector
+  - POST + HMAC-SHA256 signing ✅
+  - Exponential backoff retry ❌ (maxRetries config exists but no backoff loop)
+- [~] **6.3** `connectors/s3-export/` — S3 dump connector
+  - Per-event Hive-partitioned S3 write ✅
+  - Batching by hour / file per source ❌ (writes per-event, not batched)
 - [ ] **6.4** `infra/src/constructs/ActivationConstruct.ts`
-  - SQS queue per connector type + DLQ (maxReceiveCount: 3)
-  - Lambda per connector (reads from SQS, runs connector handler)
-  - Processor Lambda publishes to SQS queues for enabled destinations
-- [ ] **6.5** Unit tests for connector handlers
+  - SQS fan-out queue exists in ProcessingConstruct ✅
+  - Dedicated ActivationConstruct + connector Lambdas ❌ not created
+- [~] **6.5** Unit tests: webhook ✅ — s3-export ❌
 - [ ] **6.6** CDK snapshot tests for ActivationConstruct
 
 ---
 
 ## Phase 7 — Management API (CDK + Lambda)
 
-- [ ] **7.1** `infra/src/constructs/AdminConstruct.ts`
-  - Cognito User Pool + App Client (email/password auth)
-  - API Gateway HTTP API with Cognito JWT authorizer
-  - Lambda handler for management routes
-  - S3 bucket for UI static assets + CloudFront distribution
-- [ ] **7.2** `services/management-api/` — CRUD Lambda
-  - Sources: `GET /sources`, `POST /sources`, `DELETE /sources/:id` (generates writeKey)
-  - Destinations: `GET /destinations`, `POST /destinations`, `PUT /destinations/:id`, `DELETE /destinations/:id`
-  - Segments: `GET /segments`, `POST /segments`, `PUT /segments/:id`, `DELETE /segments/:id`
-  - Profiles: `GET /profiles/:userId` (traits + recent events)
-  - Segment members: `GET /segments/:id/members`
+- [~] **7.1** `infra/src/constructs/AdminConstruct.ts`
+  - Cognito User Pool + App Client ✅
+  - API Gateway + Lambda ✅
+  - CloudFront + S3 for UI ✅
+  - Cognito JWT authorizer on API routes ❌ (API is unauthenticated currently)
+- [~] **7.2** `services/management-api/` — CRUD Lambda
+  - Sources GET/POST/DELETE ✅
+  - Destinations GET/POST/DELETE ✅ — PUT ❌ missing
+  - Segments GET/POST/DELETE ✅ — PUT ❌ missing
+  - Profiles GET ✅
+  - `GET /segments/:id/members` ❌ missing
+  - writeKey generation for sources ❌ missing
 - [ ] **7.3** Unit tests for management API handlers
 - [ ] **7.4** CDK snapshot tests for AdminConstruct
 
@@ -176,108 +144,77 @@
 
 ## Phase 8 — Admin UI (Next.js 16 + Tailwind CSS v4)
 
-- [ ] **8.1** Scaffold Next.js 16 app in `ui/`
-  - `output: 'export'` in `next.config.ts` (static export → S3)
-  - Tailwind CSS v4 (`@import "tailwindcss"` CSS-first config)
-  - shadcn/ui components (adapted for Tailwind v4)
-  - Cognito auth via `amazon-cognito-identity-js` or Auth.js
-- [ ] **8.2** Pages
-  - `/` — Dashboard (event volume chart, profile count, active segments)
-  - `/sources` — List + create sources, copy write key + SDK snippet
-  - `/destinations` — List + create/configure destinations
-  - `/profiles` — Search profiles by email/userId, view traits + event timeline
-  - `/segments` — List segments, visual rule builder, preview membership count
-  - `/settings` — Account, retention policy
-- [ ] **8.3** API client (`ui/src/lib/api.ts`)
-  - Typed fetch wrapper pointing to Management API Gateway URL
-  - Attaches Cognito JWT to all requests
-- [ ] **8.4** CDK deploys UI: `aws s3 sync ui/out/ s3://<bucket>` + CloudFront invalidation
+- [~] **8.1** Scaffold Next.js app in `ui/`
+  - `output: 'export'` + Tailwind CSS v4 ✅
+  - shadcn/ui components ❌ not added
+  - Cognito auth ❌ not integrated
+- [~] **8.2** Pages
+  - `/sources` ✅, `/destinations` ✅, `/profiles` ✅, `/segments` ✅
+  - `/` Dashboard with charts/stats ❌ (only nav cards)
+  - `/settings` ❌ missing
+  - SDK snippet in sources page ❌ missing
+  - Visual segment rule builder ❌ (create only, no rule UI)
+- [ ] **8.3** API client (`ui/src/lib/api.ts`) — typed fetch wrapper with Cognito JWT
+- [ ] **8.4** CDK UI deploy integration (`s3 sync` + CloudFront invalidation)
 
 ---
 
 ## Phase 9 — CLI (`uniflow`)
 
-- [ ] **9.1** Scaffold CLI in `cli/` using `commander` + `inquirer`
-  - Published as `uniflow` on npm (binary entry point)
-- [ ] **9.2** `uniflow init`
-  - Interactive prompts: AWS region, admin email, connectors to enable
-  - Generates `uniflow.config.yaml` in current directory
-  - Validates AWS credentials (`aws sts get-caller-identity`)
-- [ ] **9.3** `uniflow deploy`
-  - Reads `uniflow.config.yaml`
-  - Runs `cdk bootstrap` if needed
-  - Runs `cdk deploy UnifowStack`
-  - Prints deployed endpoint URLs + admin credentials
-- [ ] **9.4** `uniflow upgrade`
-  - Pulls latest `uniflow` version
-  - Runs pending migrations (checks `MIGRATION#*` records in DynamoDB)
-  - Runs `cdk deploy` with new version
-- [ ] **9.5** `uniflow status`
-  - Checks API Gateway health endpoint
-  - Reports Kinesis stream status, ECS task last run, DynamoDB item counts
-- [ ] **9.6** `uniflow destroy`
-  - Confirmation prompt
-  - Runs `cdk destroy UnifowStack`
-- [ ] **9.7** Migration system
-  - `cli/src/migrations/` — ordered `.ts` files (`0001_init.ts`, `0002_...ts`)
-  - Each migration: idempotent, records completion in DynamoDB
-  - Migration runner: load pending → execute in order → mark complete
-- [ ] **9.8** Unit tests for CLI commands (mock CDK + AWS SDK calls)
+- [x] **9.1** Scaffold CLI in `cli/` using `commander` + `inquirer` (binary entry point)
+- [~] **9.2** `uniflow init`
+  - Interactive prompts + generates `uniflow.config.yaml` ✅
+  - AWS credentials validation (`aws sts get-caller-identity`) ❌ missing
+- [~] **9.3** `uniflow deploy`
+  - Reads config + runs `cdk deploy` ✅
+  - `cdk bootstrap` check ❌ missing
+  - Prints endpoint URLs after deploy ❌ missing
+- [x] **9.4** `uniflow upgrade` — updates package, runs migrations, redeploys ✅
+- [~] **9.5** `uniflow status` — CloudFormation stack status + outputs ✅
+  - Kinesis stream status, ECS task last run, DynamoDB item counts ❌ missing
+- [x] **9.6** `uniflow destroy` — confirmation prompt + `cdk destroy` ✅
+- [x] **9.7** Migration system — DynamoDB-backed, idempotent, ordered ✅
+- [ ] **9.8** Unit tests for CLI commands
 
 ---
 
 ## Phase 10 — Client SDKs
 
-- [ ] **10.1** `sdk/js/` — `@uniflow/js` (Browser + Node.js)
-  - Auto-generates `anonymousId` (localStorage / cookie)
-  - `analytics.track()`, `.identify()`, `.page()`, `.group()`
-  - Event batching (flush every 30 events or 5 seconds)
-  - Retry with exponential backoff
-  - TypeScript types
-- [ ] **10.2** `sdk/python/` — `uniflow-python`
-  - Same API shape as JS SDK
-  - Thread-safe batch queue
-  - `pip install uniflow-python`
-- [ ] **10.3** Unit tests for both SDKs
+- [~] **10.1** `sdk/js/` — `@uniflow/js`
+  - `track()`, `identify()`, `page()` ✅ — `group()` ❌ missing from JS SDK
+  - `anonymousId` via localStorage ✅
+  - Event batching + auto-flush ✅
+  - Exponential backoff retry ❌ (re-queues on failure but no backoff)
+  - TypeScript types ✅
+- [x] **10.2** `sdk/python/` — `uniflow-python`
+  - `track`, `identify`, `page`, `group` ✅
+  - Thread-safe batch queue ✅
+- [~] **10.3** Unit tests: JS SDK ✅, Python SDK ✅ (but `group()` not tested in JS)
 
 ---
 
 ## Phase 11 — Local Dev
 
-- [ ] **11.1** `docker/docker-compose.yml`
-  - LocalStack (DynamoDB, S3, Kinesis, SQS)
-  - Ingest Lambda local via SAM Local or direct Node.js process
-  - Audience builder container (local image build)
-- [ ] **11.2** `docker/localstack/init.sh`
-  - Create DynamoDB tables, S3 buckets, Kinesis streams on startup
-- [ ] **11.3** `uniflow dev` CLI command (optional) — starts docker-compose + watches for changes
-- [ ] **11.4** README: "Run locally in 3 commands"
-  ```bash
-  docker compose up -d
-  uniflow init --local
-  curl http://localhost:3000/v1/track -d '{"type":"track","event":"Test"}'
-  ```
+- [~] **11.1** `docker/docker-compose.yml`
+  - LocalStack (DynamoDB, S3, Kinesis, SQS) ✅
+  - Audience builder container profile ✅
+  - Ingest Lambda via SAM Local ❌ not wired up
+- [x] **11.2** `docker/localstack/init/01_setup.sh` — provisions all AWS resources on startup ✅
+- [ ] **11.3** `uniflow dev` CLI command
+- [ ] **11.4** README "Run locally in 3 commands" quickstart section
 
 ---
 
 ## Phase 12 — Main CDK Stack + Docs
 
-- [ ] **12.1** `infra/src/stacks/UnifowStack.ts`
-  - Composes all constructs: Storage → Ingestion → Processing → Audience → Activation → Admin
-  - Accepts `UnifowStackProps` (from `uniflow.config.yaml`)
-  - Exports: API endpoint, Admin UI URL, CloudFront URL
-- [ ] **12.2** `examples/basic/` — minimal CDK app using `@uniflow/cdk`
-  ```typescript
-  import { UnifowStack } from '@uniflow/cdk';
-  new UnifowStack(app, 'Uniflow', { adminEmail: 'you@example.com' });
-  ```
+- [~] **12.1** `infra/src/stacks/UnifowStack.ts`
+  - Composes Storage, Ingestion, Processing, Audience, Admin ✅
+  - ActivationConstruct ❌ not composed (not yet created)
+  - CloudFormation outputs ✅
+- [x] **12.2** `examples/cdk-app/index.ts` — minimal CDK app using `@uniflow/cdk` ✅
 - [ ] **12.3** Docusaurus docs in `docs/`
-  - Quickstart (< 5 min deploy)
-  - Architecture overview
-  - Event schema reference
-  - Connector SDK guide (how to build community connectors)
-  - Upgrade guide
-- [ ] **12.4** `README.md` — hero section, quickstart, architecture diagram, contributing guide
+- [~] **12.4** `README.md` — architecture, quickstart, table of contents ✅
+  - Contributing guide ❌ missing
 
 ---
 
