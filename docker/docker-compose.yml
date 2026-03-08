@@ -1,0 +1,36 @@
+version: '3.9'
+
+services:
+  localstack:
+    image: localstack/localstack:3
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=dynamodb,s3,kinesis,sqs,firehose,athena
+      - DEBUG=0
+      - DATA_DIR=/var/lib/localstack/data
+      - AWS_DEFAULT_REGION=us-east-1
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - ./localstack/init:/etc/localstack/init/ready.d
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  audience-builder:
+    build:
+      context: ../services/audience-builder
+      dockerfile: Dockerfile
+    environment:
+      - PROFILE_TABLE_NAME=uniflow-profiles
+      - RAW_BUCKET_NAME=uniflow-raw
+      - ATHENA_OUTPUT_BUCKET=uniflow-processed
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_ENDPOINT_URL=http://localstack:4566
+    depends_on:
+      - localstack
+    profiles:
+      - full
+
+volumes:
+  localstack_data:

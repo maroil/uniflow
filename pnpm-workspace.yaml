@@ -1,0 +1,8 @@
+packages:
+  - "infra"
+  - "services/*"
+  - "connectors/*"
+  - "libs/*"
+  - "cli"
+  - "sdk/*"
+  - "ui"

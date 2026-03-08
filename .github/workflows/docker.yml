@@ -1,0 +1,34 @@
+name: Docker
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  push-ecr:
+    name: Push audience-builder to ECR Public
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Login to ECR Public
+        run: aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
+
+      - name: Build and push
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          docker build -t public.ecr.aws/uniflow/audience-builder:${VERSION} \
+            -t public.ecr.aws/uniflow/audience-builder:latest \
+            services/audience-builder/
+          docker push public.ecr.aws/uniflow/audience-builder:${VERSION}
+          docker push public.ecr.aws/uniflow/audience-builder:latest
