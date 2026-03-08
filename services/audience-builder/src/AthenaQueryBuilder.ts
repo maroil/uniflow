@@ -5,7 +5,7 @@ import type { SegmentRule } from './types.js';
  * Events are stored as JSON lines in S3 and queryable via Athena.
  */
 export class AthenaQueryBuilder {
-  buildQuery(rules: SegmentRule[], rawBucket: string, outputBucket: string): string {
+  buildQuery(rules: SegmentRule[], _rawBucket: string, _outputBucket: string): string {
     const conditions = rules.map((rule) => this.ruleToSql(rule)).join(' AND ');
     const whereClause = conditions ? `WHERE ${conditions}` : '';
 

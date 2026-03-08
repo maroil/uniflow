@@ -9,7 +9,6 @@ import {
   DynamoDBDocumentClient,
   QueryCommand,
   PutCommand,
-  DeleteCommand,
 } from '@aws-sdk/lib-dynamodb';
 import { logger } from '@uniflow/logger';
 import { AthenaQueryBuilder } from './AthenaQueryBuilder.js';

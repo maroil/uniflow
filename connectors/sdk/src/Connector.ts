@@ -1,4 +1,4 @@
-import { z, ZodSchema } from 'zod';
+import { ZodSchema } from 'zod';
 import type { ConnectorEvent, ConnectorResult } from './types';
 
 export interface ConnectorMetadata {

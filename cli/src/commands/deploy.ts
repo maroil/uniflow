@@ -32,7 +32,7 @@ export const deployCommand = new Command('deploy')
         { stdio: 'inherit' }
       );
       spinner.succeed(chalk.green('Deployment complete!'));
-    } catch (err) {
+    } catch {
       spinner.fail('CDK deploy failed');
       process.exit(1);
     }

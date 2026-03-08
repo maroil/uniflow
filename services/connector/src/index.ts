@@ -1,16 +1,13 @@
 import type { SQSEvent, SQSBatchResponse, SQSBatchItemFailure } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, ScanCommand } from '@aws-sdk/lib-dynamodb';
-import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
 import { AnyEventSchema } from '@uniflow/event-schema';
 import { logger } from '@uniflow/logger';
 import { getConnector } from './registry';
 
 const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}));
-const secrets = new SecretsManagerClient({});
 
 const TABLE_NAME = process.env.PROFILE_TABLE_NAME!;
-const SECRETS_PREFIX = process.env.SECRETS_PREFIX ?? 'uniflow/destinations';
 
 const log = logger.child({ service: 'connector' });
 

@@ -101,7 +101,7 @@ export class UnifowClient {
         },
         body: JSON.stringify({ batch: events, sentAt: new Date().toISOString() }),
       });
-    } catch (err) {
+    } catch {
       // Re-queue events on network failure (best-effort)
       this.queue.unshift(...events);
     }

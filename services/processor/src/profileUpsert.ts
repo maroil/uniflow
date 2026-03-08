@@ -1,5 +1,5 @@
 import { DynamoDBDocumentClient, UpdateCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
-import type { AnyEvent, IdentifyEvent } from '@uniflow/event-schema';
+import type { AnyEvent } from '@uniflow/event-schema';
 
 export async function upsertProfile(
   dynamo: DynamoDBDocumentClient,
