@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
+import { STSClient, GetCallerIdentityCommand } from '@aws-sdk/client-sts';
 import { saveConfig, type Config } from '../config.js';
 
 export const initCommand = new Command('init')
@@ -55,6 +56,16 @@ export const initCommand = new Command('init')
     };
 
     saveConfig(config);
+
+    // Non-blocking validation
+    try {
+      const sts = new STSClient({ region: config.region });
+      const identity = await sts.send(new GetCallerIdentityCommand({}));
+      console.log(chalk.green('✓ AWS credentials valid'));
+      console.log(chalk.dim(`  Account: ${identity.Account}  Region: ${config.region}`));
+    } catch {
+      console.log(chalk.yellow('⚠  Could not validate AWS credentials. Configure before deploying.'));
+    }
 
     console.log(chalk.green('\n✓ Created uniflow.config.yaml'));
     console.log('\nNext steps:');

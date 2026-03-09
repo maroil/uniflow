@@ -11,5 +11,6 @@ cdk.out
 .env.local
 *.log
 .DS_Store
+*.tsbuildinfo
 .turbo
 .vercel

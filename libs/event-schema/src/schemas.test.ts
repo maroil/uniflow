@@ -25,6 +25,24 @@ describe('TrackEventSchema', () => {
   });
 });
 
+describe('Event enrichment fields', () => {
+  it('accepts events with sourceId and receivedAt', () => {
+    const event = {
+      type: 'track' as const,
+      event: 'Page Loaded',
+      userId: 'user_456',
+      messageId: 'msg_xyz',
+      timestamp: '2024-01-01T00:00:00.000Z',
+      sourceId: 'src_abc',
+      receivedAt: '2024-01-01T00:00:01.000Z',
+    };
+    expect(() => TrackEventSchema.parse(event)).not.toThrow();
+    const result = AnyEventSchema.parse(event);
+    expect(result.sourceId).toBe('src_abc');
+    expect(result.receivedAt).toBe('2024-01-01T00:00:01.000Z');
+  });
+});
+
 describe('AnyEventSchema', () => {
   it('discriminates event types correctly', () => {
     const identify = {

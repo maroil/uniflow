@@ -36,6 +36,8 @@ const BaseEventSchema = z.object({
     })
     .optional(),
   writeKey: z.string().optional(),
+  sourceId: z.string().optional(),
+  receivedAt: z.string().datetime().optional(),
 });
 
 const TrackEventObjectSchema = BaseEventSchema.extend({

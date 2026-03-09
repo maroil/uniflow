@@ -22,6 +22,7 @@ export async function handler(
   event: APIGatewayProxyEventV2
 ): Promise<APIGatewayProxyStructuredResultV2> {
   const log = logger.child({ requestId: event.requestContext.requestId });
+  const sourceId = (event.requestContext as any).authorizer?.lambda?.sourceId as string | undefined;
 
   if (!event.body) {
     return response(400, { error: 'Missing request body' });
@@ -45,7 +46,7 @@ export async function handler(
       return response(400, { error: 'batch field must be an array' });
     }
     const results = await Promise.allSettled(
-      batch.batch.map((e) => processEvent(e, log))
+      batch.batch.map((e) => processEvent(e, log, { sourceId }))
     );
     const failed = results.filter((r) => r.status === 'rejected').length;
     return response(200, { processed: results.length - failed, failed });
@@ -58,7 +59,7 @@ export async function handler(
   }
 
   try {
-    await processEvent(singleRaw, log);
+    await processEvent(singleRaw, log, { sourceId });
     return response(200, { success: true });
   } catch (err) {
     if (err instanceof Error && err.name === 'ZodError') {
@@ -69,12 +70,16 @@ export async function handler(
   }
 }
 
-async function processEvent(raw: unknown, log: ReturnType<typeof logger.child>): Promise<void> {
+async function processEvent(raw: unknown, log: ReturnType<typeof logger.child>, context: { sourceId?: string }): Promise<void> {
   const rawObj = raw as Record<string, unknown>;
 
   // Enrich with messageId and timestamp if missing
   if (!rawObj.messageId) rawObj.messageId = randomUUID();
   if (!rawObj.timestamp) rawObj.timestamp = new Date().toISOString();
+
+  // Enrich with sourceId and receivedAt
+  rawObj.receivedAt = new Date().toISOString();
+  if (context.sourceId) rawObj.sourceId = context.sourceId;
 
   const parsed = AnyEventSchema.parse(rawObj);
 
